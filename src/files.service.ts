@@ -133,15 +133,11 @@ export class FilesService {
     media_id: number; media_file_name: string;
     relative_path: string; content_type: string; base_url: string;
   }): MediaFileInfo {
-    const base     = row.base_url.replace(/[/\\]$/, '');
-    const rel      = row.relative_path.startsWith('/') || row.relative_path.startsWith('\\')
-      ? row.relative_path
-      : `/${row.relative_path}`;
-    const fullPath = (base + rel).replace(/\//g, '\\');
+    const fullPath = this.resolvePath(row.base_url, row.relative_path);
 
     if (!fs.existsSync(fullPath)) {
       throw new NotFoundException(
-        `Archivo no encontrado en el file server: ${row.media_file_name} | path resuelto: ${fullPath} | base_url: ${row.base_url} | relative_path: ${row.relative_path}`,
+        `Archivo no encontrado en el file server: ${row.media_file_name} | path: ${fullPath}`,
       );
     }
 
@@ -152,5 +148,46 @@ export class FilesService {
       mediaId:     row.media_id,
       fileSize:    fs.statSync(fullPath).size,
     };
+  }
+
+  private resolvePath(baseUrl: string, relativePath: string): string {
+    const isWindows = process.platform === 'win32';
+    const isUncBase  = baseUrl.startsWith('\\\\') || baseUrl.startsWith('//');
+    const isUnixBase = baseUrl.startsWith('/');
+
+    if (isUncBase) {
+      if (isWindows) {
+        // Windows + UNC (caso nativo)
+        const base = baseUrl.replace(/[/\\]$/, '');
+        const rel  = relativePath.startsWith('/') || relativePath.startsWith('\\')
+          ? relativePath : `\\${relativePath}`;
+        return (base + rel).replace(/\//g, '\\');
+      }
+      // Linux + UNC → necesita mount point configurado en FILE_SERVER_LINUX_BASE
+      const linuxBase = process.env.FILE_SERVER_LINUX_BASE;
+      if (!linuxBase) throw new Error(
+        'La DB tiene una ruta UNC pero el servicio corre en Linux. Configura FILE_SERVER_LINUX_BASE en .env apuntando al mount point del share.',
+      );
+      const rel = relativePath.replace(/\\/g, '/');
+      return `${linuxBase.replace(/\/$/, '')}${rel.startsWith('/') ? rel : `/${rel}`}`;
+    }
+
+    if (isUnixBase) {
+      if (!isWindows) {
+        // Linux + path Unix (caso nativo)
+        const base = baseUrl.replace(/\/$/, '');
+        const rel  = relativePath.replace(/\\/g, '/');
+        return `${base}${rel.startsWith('/') ? rel : `/${rel}`}`;
+      }
+      // Windows (dev) + path Unix → necesita mapeo configurado en FILE_SERVER_WIN_BASE
+      const winBase = process.env.FILE_SERVER_WIN_BASE;
+      if (!winBase) throw new Error(
+        'La DB tiene una ruta Unix pero el servicio corre en Windows. Configura FILE_SERVER_WIN_BASE en .env (ej: \\\\192.168.22.39\\Share o Z:\\).',
+      );
+      const rel = relativePath.replace(/\//g, '\\');
+      return `${winBase.replace(/[/\\]$/, '')}${rel.startsWith('\\') ? rel : `\\${rel}`}`;
+    }
+
+    throw new Error(`base_url con formato no reconocido: ${baseUrl}`);
   }
 }
