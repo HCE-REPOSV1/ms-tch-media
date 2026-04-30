@@ -1,0 +1,17 @@
+# docker-compose.yml — ms-media-media-service
+# Uso: docker compose up -d  |  docker compose down  |  docker compose build
+
+services:
+  ms-media-media-service:
+    build: .
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-3000}/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

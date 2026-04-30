@@ -1,0 +1,116 @@
+openapi: "3.0.3"
+info:
+  title: ms-media-media-service
+  description: Media Service — Gestión de archivos — Jarvis Platform
+  version: "1.0.0"
+paths:
+  /files/upload:
+    post:
+      tags: [files]
+      summary: Subir un archivo
+      operationId: uploadFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Archivo subido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileMetadata"
+  /files:
+    get:
+      tags: [files]
+      summary: Listar todos los archivos
+      operationId: listFiles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FileMetadata"
+  /files/{id}:
+    get:
+      tags: [files]
+      summary: Obtener metadata de un archivo
+      operationId: getFile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileMetadata"
+        "404":
+          description: No encontrado
+    delete:
+      tags: [files]
+      summary: Eliminar un archivo
+      operationId: deleteFile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Eliminado
+  /files/{id}/download:
+    get:
+      tags: [files]
+      summary: Descargar un archivo
+      operationId: downloadFile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Archivo descargado
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: No encontrado
+components:
+  schemas:
+    FileMetadata:
+      type: object
+      properties:
+        id:
+          type: string
+        originalName:
+          type: string
+        filename:
+          type: string
+        mimetype:
+          type: string
+        size:
+          type: number
+        path:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
