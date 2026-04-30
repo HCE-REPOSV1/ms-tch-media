@@ -9,6 +9,8 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
+    volumes:
+      - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-3000}/health || exit 1"]
