@@ -140,7 +140,9 @@ export class FilesService {
     const fullPath = (base + rel).replace(/\//g, '\\');
 
     if (!fs.existsSync(fullPath)) {
-      throw new NotFoundException(`Archivo no encontrado en el file server: ${row.media_file_name}`);
+      throw new NotFoundException(
+        `Archivo no encontrado en el file server: ${row.media_file_name} | path resuelto: ${fullPath} | base_url: ${row.base_url} | relative_path: ${row.relative_path}`,
+      );
     }
 
     return {
