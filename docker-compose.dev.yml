@@ -1,0 +1,17 @@
+# docker-compose.dev.yml — ms-media-service (desarrollo local con Docker)
+# Uso: docker compose -f docker-compose.dev.yml up -d
+#
+# Lee las variables directamente del .env local.
+# Para desarrollo sin Docker usa: npm run start:dev
+
+services:
+  ms-media-media-service:
+    build: .
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    env_file: .env
+    environment:
+      NODE_ENV: development
+    volumes:
+      - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA
+    restart: unless-stopped

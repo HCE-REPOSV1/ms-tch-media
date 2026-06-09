@@ -1,19 +1,29 @@
-# docker-compose.yml — ms-media-media-service
-# Uso: docker compose up -d  |  docker compose down  |  docker compose build
+# docker-compose.yml — ms-media-service (producción)
+# Uso: docker compose down && docker compose build && docker compose up -d
+#
+# En el servidor solo necesitas un .env con una línea:
+#   VAULT_TOKEN=hvs.xxxx
+# El entrypoint.sh carga el resto desde Vault al arrancar.
 
 services:
   ms-media-media-service:
     build: .
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
-    env_file: .env
+      - "10406:10406"
+    env_file:
+      - .env.docker
     environment:
       NODE_ENV: production
+      PORT: "10406"
+      VAULT_ADDR: "http://host.docker.internal:8200"
+      VAULT_SECRET_PATH: "hce/nestjs/media-service"
     volumes:
-      - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA:ro
+      - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-3000}/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:10406/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
