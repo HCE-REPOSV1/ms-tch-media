@@ -11,6 +11,7 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const req   = context.switchToHttp().getRequest();
+    if (req.url === '/health') return next.handle();
     const start = Date.now();
     const auditCtx = this.logger.extractAuditContext(req.headers);
 

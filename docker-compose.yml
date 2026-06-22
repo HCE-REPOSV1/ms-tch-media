@@ -1,4 +1,4 @@
-# docker-compose.yml — ms-media-service (producción)
+# docker-compose.yml — ms-tch-media (producción)
 # Uso: docker compose down && docker compose build && docker compose up -d
 #
 # En el servidor solo necesitas un .env con una línea:
@@ -6,19 +6,24 @@
 # El entrypoint.sh carga el resto desde Vault al arrancar.
 
 services:
-  ms-media-media-service:
+  ms-tch-media:
     build: .
     ports:
       - "10406:10406"
+      - "20406:20406"
     env_file:
       - .env.docker
     environment:
       NODE_ENV: production
       PORT: "10406"
       VAULT_ADDR: "http://host.docker.internal:8200"
-      VAULT_SECRET_PATH: "hce/nestjs/media-service"
+      VAULT_SECRET_PATH: "hce/nestjs/tch-media"
+      USE_SSL: "true"
+      CERT_PATH: "/proyectos/certs"
+      SSL_PORT: "20406"
     volumes:
       - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA
+      - /proyectos/certs:/proyectos/certs:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

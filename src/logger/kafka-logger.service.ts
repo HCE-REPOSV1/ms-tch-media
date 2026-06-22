@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Kafka, Producer, logLevel } from 'kafkajs';
 
@@ -17,31 +17,51 @@ export interface AuditLogEntry {
 
 @Injectable()
 export class KafkaLoggerService implements OnModuleInit, OnModuleDestroy {
+  private readonly nestLogger = new Logger(KafkaLoggerService.name);
   private producer!: Producer;
 
-  constructor(private readonly cfg: ConfigService) {}
+  /** true si el audit logger está habilitado vía AUDIT_LOGGER_ENABLED. */
+  private readonly enabled: boolean;
+
+  constructor(private readonly cfg: ConfigService) {
+    this.enabled = this.cfg.get<string>('AUDIT_LOGGER_ENABLED', 'true').trim().toLowerCase() !== 'false';
+  }
 
   async onModuleInit() {
+    if (!this.enabled) {
+      this.nestLogger.log('Audit logger deshabilitado (AUDIT_LOGGER_ENABLED=false) — Kafka no será utilizado.');
+      return;
+    }
+
     const kafka = new Kafka({
       clientId: 'ms-media-media-service-logger',
       brokers: (this.cfg.get<string>('KAFKA_BROKER', 'localhost:9092')).split(','),
       logLevel: logLevel.ERROR,
     });
     this.producer = kafka.producer();
-    await this.producer.connect();
+    try {
+      await this.producer.connect();
+    } catch (err: any) {
+      this.nestLogger.error(`FATAL: AUDIT_LOGGER_ENABLED=true pero no se pudo conectar a Kafka — el servicio no puede iniciar. Causa: ${err?.message}`);
+      process.exit(1);
+    }
   }
 
   async onModuleDestroy() {
-    await this.producer.disconnect();
+    if (this.enabled) {
+      await this.producer.disconnect();
+    }
   }
 
   async log(entry: AuditLogEntry): Promise<void> {
+    if (!this.enabled) return;
+
     try {
       await this.producer.send({
         topic: this.cfg.get<string>('KAFKA_TOPIC', 'platform.logs'),
         messages: [{
           value: JSON.stringify({
-            source_system: 'ms-media-media-service',
+            source_system: 'ms-tch-media',
             event_type:    entry.eventType  ?? 'SERVICE_CALL',
             level:         entry.level      ?? 'INFO',
             trace_id:      entry.traceId,
@@ -56,8 +76,8 @@ export class KafkaLoggerService implements OnModuleInit, OnModuleDestroy {
           }),
         }],
       });
-    } catch {
-      // Fire and forget — nunca interrumpe el flujo de negocio
+    } catch (err: any) {
+      this.nestLogger.warn(`Kafka send fallido: ${err?.message}`);
     }
   }
 

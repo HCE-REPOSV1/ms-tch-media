@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MulterModule } from '@nestjs/platform-express';
-import { FilesController } from './files.controller';
-import { FilesService } from './files.service';
+import { FilesController } from './infrastructure/controllers/Media.controller';
+import { MediaUseCase } from './application/use-cases/Media.use-case';
+import { MediaTypeOrmRepository } from './infrastructure/persistence/media.typeorm.repository';
+import { MEDIA_REPOSITORY } from './domain/repositories/media.repository';
 import { multerConfig } from './config/multer.config';
 import { dbConfig } from './config/db.config';
 import { PractitionerMedia } from './domain/entities/PractitionerMedia.entity';
@@ -13,11 +15,12 @@ import { KafkaLoggerModule } from './logger/kafka-logger.module';
 import { AuditInterceptor } from './logger/audit.interceptor';
 import { KafkaLoggerService } from './logger/kafka-logger.service';
 
+import { HealthModule } from './health/health.module';
 @Module({
-  imports: [
+  imports: [HealthModule,
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
+      imports: [HealthModule, ConfigModule],
       useFactory: (cfg: ConfigService) => dbConfig(cfg),
       inject: [ConfigService],
     }),
@@ -27,7 +30,9 @@ import { KafkaLoggerService } from './logger/kafka-logger.service';
   ],
   controllers: [FilesController],
   providers: [
-    FilesService,
+    MediaUseCase,
+    MediaTypeOrmRepository,
+    { provide: MEDIA_REPOSITORY, useClass: MediaTypeOrmRepository },
     KafkaLoggerService,
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],

@@ -3,27 +3,10 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-
-export interface FileMetadata {
-  id:           string;
-  originalName: string;
-  filename:     string;
-  mimetype:     string;
-  size:         number;
-  path:         string;
-  createdAt:    string;
-}
-
-export interface MediaFileInfo {
-  fullPath:     string;
-  fileName:     string;
-  contentType:  string;
-  mediaId:      number;
-  fileSize:     number;
-}
+import { MediaRepository, FileMetadata, MediaFileInfo } from '../../domain/repositories/media.repository';
 
 @Injectable()
-export class FilesService {
+export class MediaTypeOrmRepository implements MediaRepository {
   private readonly store: FileMetadata[] = [];
 
   constructor(
@@ -151,19 +134,26 @@ export class FilesService {
   }
 
   private resolvePath(baseUrl: string, relativePath: string): string {
-    const isWindows = process.platform === 'win32';
+    // Dos ejes independientes:
+    // 1) ¿Hay que usar el path de la DB tal cual, o un override de .env? Eso depende de NODE_ENV
+    //    (producción real en Linux vs. dev), NO de process.platform — que dentro de un contenedor
+    //    Docker siempre es 'linux', incluso con host Windows (docker-compose.dev.yml).
+    // 2) ¿Con qué separador hay que unir el path final? Eso sí depende del proceso real
+    //    (process.platform): backslash solo si Node corre nativo en Windows (sin Docker).
+    const isDev    = process.env.NODE_ENV !== 'production';
     const isUncBase  = baseUrl.startsWith('\\\\') || baseUrl.startsWith('//');
     const isUnixBase = baseUrl.startsWith('/');
+    const nativeWindows = process.platform === 'win32';
 
     if (isUncBase) {
-      if (isWindows) {
-        // Windows + UNC (caso nativo)
+      if (!isDev) {
+        // Producción nativa en Windows + UNC: usar tal cual con backslashes.
         const base = baseUrl.replace(/[/\\]$/, '');
         const rel  = relativePath.startsWith('/') || relativePath.startsWith('\\')
           ? relativePath : `\\${relativePath}`;
         return (base + rel).replace(/\//g, '\\');
       }
-      // Linux + UNC → necesita mount point configurado en FILE_SERVER_LINUX_BASE
+      // Dev (Linux nativo, o Docker con host Windows) + UNC → mount point configurado en FILE_SERVER_LINUX_BASE.
       const linuxBase = process.env.FILE_SERVER_LINUX_BASE;
       if (!linuxBase) throw new Error(
         'La DB tiene una ruta UNC pero el servicio corre en Linux. Configura FILE_SERVER_LINUX_BASE en .env apuntando al mount point del share.',
@@ -173,19 +163,27 @@ export class FilesService {
     }
 
     if (isUnixBase) {
-      if (!isWindows) {
-        // Linux + path Unix (caso nativo)
+      if (!isDev) {
+        // Producción real en Linux + path Unix: usar tal cual.
         const base = baseUrl.replace(/\/$/, '');
         const rel  = relativePath.replace(/\\/g, '/');
         return `${base}${rel.startsWith('/') ? rel : `/${rel}`}`;
       }
-      // Windows (dev) + path Unix → necesita mapeo configurado en FILE_SERVER_WIN_BASE
+      // Dev + path Unix → necesita mapeo configurado en FILE_SERVER_WIN_BASE. Su valor debe ser:
+      //   - el path real de Windows (ej. C:\... o \\server\share) si se corre sin Docker
+      //     (npm run start:dev, donde process.platform sí es 'win32')
+      //   - el path DENTRO del contenedor donde se montó la carpeta de Windows, si se corre
+      //     vía docker-compose.dev.yml (donde process.platform siempre es 'linux')
       const winBase = process.env.FILE_SERVER_WIN_BASE;
       if (!winBase) throw new Error(
-        'La DB tiene una ruta Unix pero el servicio corre en Windows. Configura FILE_SERVER_WIN_BASE en .env (ej: \\\\192.168.22.39\\Share o Z:\\).',
+        'La DB tiene una ruta Unix pero el servicio corre en modo dev. Configura FILE_SERVER_WIN_BASE en .env.',
       );
-      const rel = relativePath.replace(/\//g, '\\');
-      return `${winBase.replace(/[/\\]$/, '')}${rel.startsWith('\\') ? rel : `\\${rel}`}`;
+      if (nativeWindows) {
+        const rel = relativePath.replace(/\//g, '\\');
+        return `${winBase.replace(/[/\\]$/, '')}${rel.startsWith('\\') ? rel : `\\${rel}`}`;
+      }
+      const rel = relativePath.replace(/\\/g, '/');
+      return `${winBase.replace(/\/$/, '')}${rel.startsWith('/') ? rel : `/${rel}`}`;
     }
 
     throw new Error(`base_url con formato no reconocido: ${baseUrl}`);

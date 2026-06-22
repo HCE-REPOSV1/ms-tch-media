@@ -1,28 +1,39 @@
 import {
   Controller, Get, Post, Delete, Param, Res,
   UploadedFile, UseInterceptors, HttpCode, NotFoundException,
-  StreamableFile, Req,
+  StreamableFile, Req, Version,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import type { Request } from 'express';
 import * as fs from 'fs';
-import { KafkaLoggerService } from './logger/kafka-logger.service';
-import { FilesService, MediaFileInfo } from './files.service';
+import { KafkaLoggerService } from '../../logger/kafka-logger.service';
+import { MediaUseCase } from '../../application/use-cases/Media.use-case';
+import { MediaFileInfo } from '../../domain/repositories/media.repository';
 
-@ApiTags('files')
-@Controller('files')
+@ApiTags('media')
+@Controller('media')
 export class FilesController {
   constructor(
-    private readonly filesService: FilesService,
+    private readonly mediaUseCase: MediaUseCase,
     private readonly kafkaLogger: KafkaLoggerService,
   ) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar todos los archivos subidos en sesion' })
   findAll() {
-    return this.filesService.findAll();
+    return this.mediaUseCase.findAll();
+  }
+
+  // EJEMPLO v2 — mismo recurso (GET /files), contrato distinto: envuelve el array
+  // en un objeto con metadata. v1 sigue intacto para clientes que no migraron.
+  @Version('2')
+  @Get()
+  @ApiOperation({ summary: 'Listar todos los archivos subidos en sesion (v2: respuesta envuelta)' })
+  findAllV2() {
+    const data = this.mediaUseCase.findAll();
+    return { apiVersion: 2, count: data.length, data };
   }
 
   @Get('practitioner/:practitionerUuid/photo')
@@ -33,7 +44,7 @@ export class FilesController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
   ): Promise<StreamableFile> {
-    const media = await this.filesService.resolveByPractitionerUuid(practitionerUuid);
+    const media = await this.mediaUseCase.resolveByPractitionerUuid(practitionerUuid);
 
     await this.kafkaLogger.log({
       ...this.kafkaLogger.extractAuditContext(req.headers as any),
@@ -55,7 +66,7 @@ export class FilesController {
     @Res({ passthrough: true }) res: Response,
     @Req() req: Request,
   ): Promise<StreamableFile> {
-    const media = await this.filesService.resolveByMediaId(Number(mediaId));
+    const media = await this.mediaUseCase.resolveByMediaId(Number(mediaId));
 
     await this.kafkaLogger.log({
       ...this.kafkaLogger.extractAuditContext(req.headers as any),
@@ -72,7 +83,7 @@ export class FilesController {
   @Get(':id')
   @ApiOperation({ summary: 'Obtener metadata de un archivo subido' })
   findOne(@Param('id') id: string) {
-    return this.filesService.findOne(id);
+    return this.mediaUseCase.findOne(id);
   }
 
   @Post('upload')
@@ -82,7 +93,7 @@ export class FilesController {
   @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
   async upload(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
     if (!file) throw new NotFoundException('No se recibió ningún archivo');
-    const result = this.filesService.saveMetadata(file);
+    const result = this.mediaUseCase.upload(file);
     await this.kafkaLogger.log({
       ...this.kafkaLogger.extractAuditContext(req.headers as any),
       eventType: 'FILE_UPLOAD',
@@ -97,8 +108,8 @@ export class FilesController {
   @Get(':id/download')
   @ApiOperation({ summary: 'Descargar un archivo subido' })
   async download(@Param('id') id: string, @Res() res: Response, @Req() req: Request) {
-    const filePath = this.filesService.getFilePath(id);
-    const meta     = this.filesService.findOne(id);
+    const filePath = this.mediaUseCase.getFilePath(id);
+    const meta     = this.mediaUseCase.findOne(id);
     await this.kafkaLogger.log({
       ...this.kafkaLogger.extractAuditContext(req.headers as any),
       eventType: 'FILE_DOWNLOAD',
@@ -116,8 +127,8 @@ export class FilesController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Eliminar un archivo subido' })
   async remove(@Param('id') id: string, @Req() req: Request) {
-    const meta = this.filesService.findOne(id);
-    this.filesService.remove(id);
+    const meta = this.mediaUseCase.findOne(id);
+    this.mediaUseCase.remove(id);
     await this.kafkaLogger.log({
       ...this.kafkaLogger.extractAuditContext(req.headers as any),
       eventType: 'FILE_DELETE',
@@ -133,8 +144,8 @@ export class FilesController {
     req: Request,
     res: Response,
   ): StreamableFile {
-    const disposition  = this.filesService.resolveDisposition(media.contentType, media.fileName);
-    const cacheControl = this.filesService.resolveCacheControl(media.contentType);
+    const disposition  = this.mediaUseCase.resolveDisposition(media.contentType, media.fileName);
+    const cacheControl = this.mediaUseCase.resolveCacheControl(media.contentType);
     const isVideo      = media.contentType.startsWith('video/');
 
     res.setHeader('Content-Type',        media.contentType);

@@ -1,5 +1,5 @@
 {
-  "name": "ms-media-media-service",
+  "name": "ms-media-service",
   "version": "1.0.0",
   "scripts": {
     "start": "node dist/main",
