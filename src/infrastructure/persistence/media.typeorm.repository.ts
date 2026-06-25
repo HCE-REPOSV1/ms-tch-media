@@ -56,10 +56,10 @@ export class MediaTypeOrmRepository implements MediaRepository {
           m.relative_path,
           m.content_type,
           fs.base_url
-      FROM fhir.practitioner_media m
+      FROM practitioner.practitioner_media m
       INNER JOIN cfg.file_server_config fs
              ON fs.config_id = m.file_server_config_id AND fs.is_active = 1
-      INNER JOIN fhir.practitioner p
+      INNER JOIN practitioner.practitioner p
              ON p.practitioner_id = m.practitioner_id AND p.is_active = 1
       WHERE p.practitioner_uuid = @0
         AND m.is_primary = 1
@@ -83,7 +83,7 @@ export class MediaTypeOrmRepository implements MediaRepository {
           m.relative_path,
           m.content_type,
           fs.base_url
-      FROM fhir.practitioner_media m
+      FROM practitioner.practitioner_media m
       INNER JOIN cfg.file_server_config fs
              ON fs.config_id = m.file_server_config_id AND fs.is_active = 1
       WHERE m.media_id  = @0

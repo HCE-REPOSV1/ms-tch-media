@@ -60,7 +60,7 @@ export class FilesController {
 
   @Get('media/:mediaId/file')
   @ApiOperation({ summary: 'Servir archivo de media por ID' })
-  @ApiParam({ name: 'mediaId', description: 'ID del registro en fhir.practitioner_media' })
+  @ApiParam({ name: 'mediaId', description: 'ID del registro en practitioner.practitioner_media' })
   async serveByMediaId(
     @Param('mediaId') mediaId: string,
     @Res({ passthrough: true }) res: Response,
