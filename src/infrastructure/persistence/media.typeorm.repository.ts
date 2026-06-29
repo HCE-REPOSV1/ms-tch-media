@@ -147,43 +147,40 @@ export class MediaTypeOrmRepository implements MediaRepository {
 
     if (isUncBase) {
       if (!isDev) {
-        // Producción nativa en Windows + UNC: usar tal cual con backslashes.
         const base = baseUrl.replace(/[/\\]$/, '');
         const rel  = relativePath.startsWith('/') || relativePath.startsWith('\\')
           ? relativePath : `\\${relativePath}`;
         return (base + rel).replace(/\//g, '\\');
       }
-      // Dev (Linux nativo, o Docker con host Windows) + UNC → mount point configurado en FILE_SERVER_LINUX_BASE.
-      const linuxBase = process.env.FILE_SERVER_LINUX_BASE;
-      if (!linuxBase) throw new Error(
-        'La DB tiene una ruta UNC pero el servicio corre en Linux. Configura FILE_SERVER_LINUX_BASE en .env apuntando al mount point del share.',
+      const mediaPath = process.env.MEDIA_PATH;
+      if (!mediaPath) throw new Error(
+        'La DB tiene una ruta UNC pero el servicio corre en dev. Configura MEDIA_PATH en .env apuntando al mount point del share.',
       );
       const rel = relativePath.replace(/\\/g, '/');
-      return `${linuxBase.replace(/\/$/, '')}${rel.startsWith('/') ? rel : `/${rel}`}`;
+      return `${mediaPath.replace(/\/$/, '')}${rel.startsWith('/') ? rel : `/${rel}`}`;
     }
 
     if (isUnixBase) {
       if (!isDev) {
-        // Producción real en Linux + path Unix: usar tal cual.
         const base = baseUrl.replace(/\/$/, '');
         const rel  = relativePath.replace(/\\/g, '/');
         return `${base}${rel.startsWith('/') ? rel : `/${rel}`}`;
       }
-      // Dev + path Unix → necesita mapeo configurado en FILE_SERVER_WIN_BASE. Su valor debe ser:
-      //   - el path real de Windows (ej. C:\... o \\server\share) si se corre sin Docker
-      //     (npm run start:dev, donde process.platform sí es 'win32')
-      //   - el path DENTRO del contenedor donde se montó la carpeta de Windows, si se corre
-      //     vía docker-compose.dev.yml (donde process.platform siempre es 'linux')
-      const winBase = process.env.FILE_SERVER_WIN_BASE;
-      if (!winBase) throw new Error(
-        'La DB tiene una ruta Unix pero el servicio corre en modo dev. Configura FILE_SERVER_WIN_BASE en .env.',
+      const mediaPath = process.env.MEDIA_PATH;
+      if (!mediaPath) throw new Error(
+        'La DB tiene una ruta Unix pero el servicio corre en dev. Configura MEDIA_PATH en .env.',
+      );
+      const isWindowsPath = /^[A-Za-z]:[\\\/]/.test(mediaPath);
+      if (isWindowsPath && !nativeWindows) throw new Error(
+        `MEDIA_PATH contiene una ruta de Windows ("${mediaPath}") pero el proceso corre en Linux/Docker. ` +
+        'En docker-compose.dev.yml monta tu carpeta como volume y usa la ruta del contenedor (ej: /dev-media).',
       );
       if (nativeWindows) {
         const rel = relativePath.replace(/\//g, '\\');
-        return `${winBase.replace(/[/\\]$/, '')}${rel.startsWith('\\') ? rel : `\\${rel}`}`;
+        return `${mediaPath.replace(/[/\\]$/, '')}${rel.startsWith('\\') ? rel : `\\${rel}`}`;
       }
       const rel = relativePath.replace(/\\/g, '/');
-      return `${winBase.replace(/\/$/, '')}${rel.startsWith('/') ? rel : `/${rel}`}`;
+      return `${mediaPath.replace(/\/$/, '')}${rel.startsWith('/') ? rel : `/${rel}`}`;
     }
 
     throw new Error(`base_url con formato no reconocido: ${baseUrl}`);

@@ -8,19 +8,19 @@ services:
   ms-media-media-service:
     build: .
     ports:
-      - "${PORT:-3000}:${PORT:-3000}"
-      - "${SSL_PORT:-20406}:${SSL_PORT:-20406}"
+      - "10406:10406"
+      - "20406:20406"
     env_file: .env
     environment:
       NODE_ENV: development
     volumes:
-      - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA
-      # Carpeta relativa al repo (portable entre máquinas) — contiene una foto de
-      # prueba para validar el flujo de fotos de perfil en dev sin depender de un
-      # path absoluto de Windows local. Cada dev puede agregar sus propios archivos aquí.
-      - ./dev-media:/dev-media
-      # Certificado autofirmado de prueba (generado con openssl, nunca commiteado — ver .gitignore)
-      - ./certs-dev:/app/certs:ro
+      - ${MEDIA_HOST_PATH:-./dev-media}:/proyectos/NEW_HCE/MEDIA
+      - ${CERTS_HOST_PATH:-../certs-dev}:/app/certs:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+
+networks:
+  default:
+    name: hce-dev
+    external: true
