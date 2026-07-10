@@ -1,4 +1,4 @@
-# docker-compose.yml — ms-tch-media (producción)
+﻿# docker-compose.yml — ms-tch-media (producción)
 # Uso: docker compose down && docker compose build && docker compose up -d
 #
 # En el servidor solo necesitas un .env con una línea:
@@ -18,11 +18,8 @@ services:
       PORT: "10406"
       VAULT_ADDR: "http://host.docker.internal:8200"
       VAULT_SECRET_PATH: "hce/nestjs/tch-media"
-      USE_SSL: "true"
-      CERT_PATH: "/proyectos/certs"
-      SSL_PORT: "20406"
     volumes:
-      - /proyectos/NEW_HCE/MEDIA:/proyectos/NEW_HCE/MEDIA
+      - ${MEDIA_PATH:-/proyectos/NEW_HCE/MEDIA}:/proyectos/NEW_HCE/MEDIA
       - /proyectos/certs:/proyectos/certs:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -32,3 +29,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+networks:
+  default:
+    name: hce-dev
+    external: true

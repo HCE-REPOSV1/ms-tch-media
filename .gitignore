@@ -12,3 +12,5 @@ CLAUDE.md
 .env.docker
 .env
 .env.*
+certs-dev/
+/dev-media

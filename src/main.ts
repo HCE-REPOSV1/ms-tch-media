@@ -1,21 +1,23 @@
-import { NestFactory }    from '@nestjs/core';
+﻿import { NestFactory }    from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { AppModule }      from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as http  from 'http';
 import * as https from 'https';
 import { buildHttpsOptions } from './ssl/ssl-config.util';
+import { GlobalExceptionFilter } from './filters/global-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+  app.useGlobalFilters(new GlobalExceptionFilter());
   app.setGlobalPrefix('api', { exclude: ['health'] });
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1', prefix: 'v' });
 
   if (process.env.NODE_ENV !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('ms-media-service')
-      .setDescription('Media Service — Generado por Jarvis Platform')
+      .setDescription('Media Service — Generado por Platform Starter')
       .setVersion('1.0')
       .build();
     SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));

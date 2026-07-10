@@ -20,7 +20,7 @@ export interface MediaFileInfo {
 
 /**
  * Puerto hacia el origen de datos de media: metadata en memoria (uploads de sesión)
- * y la consulta cruzada fhir.practitioner_media + cfg.file_server_config en SQL Server.
+ * y la consulta cruzada practitioner.practitioner_media + cfg.file_server_config en SQL Server.
  * El único adapter (MediaTypeOrmRepository) implementa ambos accesos.
  */
 export interface MediaRepository {
